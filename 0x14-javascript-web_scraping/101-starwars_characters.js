@@ -1,27 +1,44 @@
-import requests
+#!/usr/bin/node
 
-def get_movie_characters(movie_id):
-    # URL of the Star Wars API films endpoint
-    url = f"https://swapi.dev/api/films/{movie_id}/"
-    
-    # Sending a GET request to the API
-    response = requests.get(url)
-    
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Extracting character URLs from the response
-        character_urls = response.json()['characters']
-        
-        # Fetching character names from their respective URLs
-        for character_url in character_urls:
-            character_response = requests.get(character_url)
-            if character_response.status_code == 200:
-                character_name = character_response.json()['name']
-                print(character_name)
-            else:
-                print(f"Failed to retrieve character data from URL: {character_url}")
-    else:
-        print(f"Failed to retrieve movie data for Movie ID: {movie_id}")
+const request = require('request');
 
-# Example usage: Movie ID for "Return of the Jedi" is 3
-get_movie_characters(3)
+const movieId = process.argv[2];
+
+const apiUrl = `https://swapi.dev/api/films/${movieId}/`;
+
+//  the 'request' module to perform an HTTP GET request to the Star Wars API URL.
+request(apiUrl, function (error, response, body) {
+  // Check if there was no error during the HTTP request
+  if (!error && response.statusCode === 200) {
+    // Parse the JSON response bod
+    const movieData = JSON.parse(body);
+    // create an array of promises that fetch the data for each individual character.
+    const characterPromises = movieData.characters.map((characterUrl) => {
+      return new Promise((resolve, reject) => {
+        // Use another 'request' to fetch the data for the individual character.
+        request(characterUrl, function (charError, charResponse, charBody) {
+          // Check if there was no error during the HTTP request
+          if (!charError && charResponse.statusCode === 200) {
+            // Parse the JSON response body
+            const characterData = JSON.parse(charBody);
+            // Resolve the promise with the name of the character.
+            resolve(characterData.name);
+          } else {
+            // reject the promise with the error message if  there was an error during the HTTP request
+            reject(new Error(`Error fetching character data: ${charError}`));
+          }
+        });
+      });
+    });
+
+    Promise.all(characterPromises)
+      .then((characterNames) => {
+        console.log(characterNames.join('\n'));
+      })
+      .catch((error) => {
+        console.error(error.message);
+      });
+  } else {
+    console.error('Error fetching movie data:', error);
+  }
+});
